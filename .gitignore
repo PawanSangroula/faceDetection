@@ -1,1 +1,7 @@
-cenv/
+penv/
+*.dat
+*.task
+*.caffemodel
+vision/database
+vision/encoded
+vision/encodings
