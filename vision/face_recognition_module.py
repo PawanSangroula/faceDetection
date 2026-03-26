@@ -3,8 +3,7 @@ import numpy as np
 import dlib
 import pickle
 import os
-from datetime import datetime
-import csv
+import requests
 
 # ----------------------------
 # Load dlib models
@@ -56,7 +55,19 @@ frame_count = 0
 last_face_locations = []
 last_face_names = []
 
-THRESHOLD = 0.5  # lower = stricter matching
+THRESHOLD = 0.5
+BACKEND_URL = "http://localhost:5000/attendance"
+
+def mark_attendance(name):
+    """Send attendance to Flask backend."""
+    try:
+        response = requests.post(BACKEND_URL, json={"name": name})
+        if response.status_code == 201:
+            print(f"{name} attendance marked successfully")
+        else:
+            print(f"Failed to mark {name}: {response.json()}")
+    except Exception as e:
+        print(f"Could not reach backend: {e}")
 
 while True:
     ret, frame = cap.read()
@@ -111,17 +122,11 @@ while True:
         last_face_locations = scaled_locations
         last_face_names = face_names
 
-        # Mark attendance
+        # Mark attendance via Flask backend
         for name in face_names:
             if name != "Unknown" and name not in marked_students:
                 marked_students.add(name)
-                if not os.path.exists("database"):
-                    os.makedirs("database")
-                with open("database/attendance.csv", "a", newline="") as f:
-                    writer = csv.writer(f)
-                    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    writer.writerow([name, now])
-                print(f"{name} attendance marked at {now}")
+                mark_attendance(name)
 
     # Draw boxes every frame for smooth display
     for (startX, startY, endX, endY), name in zip(last_face_locations, last_face_names):
