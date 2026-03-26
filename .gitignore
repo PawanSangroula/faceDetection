@@ -7,3 +7,5 @@ vision/encoded
 vision/encodings
 database/
 *.db
+__pycache__/
+*.pyc

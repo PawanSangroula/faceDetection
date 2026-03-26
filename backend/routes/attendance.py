@@ -1,53 +1,61 @@
 from flask import Blueprint, request, jsonify
 from database import get_db
-from models import save_attendance, get_all_attendance, get_attendance_by_name
+from datetime import datetime
 
-attendance_bp = Blueprint("attendance", __name__)
+attendance_bp = Blueprint('attendance', __name__)
 
-
-@attendance_bp.route("/attendance", methods=["POST"])
+# ✅ POST: Save attendance (only once per day)
+@attendance_bp.route('/attendance', methods=['POST'])
 def mark_attendance():
     data = request.get_json()
 
-    if not data or "name" not in data:
-        return jsonify({"success": False, "error": "name is required"}), 400
+    student_name = data.get("name")
+    marked_at = data.get("time")
 
-    name = data["name"].strip()
-    if not name:
-        return jsonify({"success": False, "error": "name cannot be empty"}), 400
+    if not student_name or not marked_at:
+        return jsonify({"error": "Missing data"}), 400
 
-    try:
-        with get_db() as conn:
-            cursor = conn.cursor()
-            save_attendance(cursor, name)
+    conn = get_db()
+    cursor = conn.cursor()
 
-        return jsonify({
-            "success": True,
-            "message": f"Attendance marked for {name}"
-        }), 201
+    # 🔥 Check if already marked today
+    today = datetime.now().strftime("%Y-%m-%d")
 
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+    existing = cursor.execute("""
+        SELECT * FROM attendance
+        WHERE student_name = ?
+        AND DATE(marked_at) = ?
+    """, (student_name, today)).fetchone()
+
+    if existing:
+        conn.close()
+        return jsonify({"message": "Already marked today"}), 200
+
+    # ✅ Insert if not marked today
+    cursor.execute(
+        "INSERT INTO attendance (student_name, marked_at) VALUES (?, ?)",
+        (student_name, marked_at)
+    )
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({"message": "Marked present"}), 201
 
 
-@attendance_bp.route("/attendance", methods=["GET"])
-def view_attendance():
-    name = request.args.get("name")
+# ✅ GET: View attendance
+@attendance_bp.route('/attendance', methods=['GET'])
+def get_attendance():
+    conn = get_db()
+    cursor = conn.cursor()
 
-    try:
-        with get_db() as conn:
-            cursor = conn.cursor()
+    rows = cursor.execute("""
+        SELECT * FROM attendance
+        ORDER BY marked_at DESC
+    """).fetchall()
 
-            if name:
-                records = get_attendance_by_name(cursor, name)
-            else:
-                records = get_all_attendance(cursor)
+    result = [dict(row) for row in rows]
 
-        return jsonify({
-            "success": True,
-            "count": len(records),
-            "records": records
-        }), 200
+    conn.close()
 
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+    return jsonify(result)
