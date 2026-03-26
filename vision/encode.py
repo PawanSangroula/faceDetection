@@ -19,6 +19,13 @@ for file in os.listdir(raw_folder):
         continue
 
     name = os.path.splitext(file)[0]
+    out_path = os.path.join(encoded_folder, f"{name}.pkl")
+
+    # 🔥 Skip if already encoded
+    if os.path.exists(out_path):
+        print(f"Skipping {name} (already encoded)")
+        continue
+
     with open(os.path.join(raw_folder, file), "rb") as f:
         frames = pickle.load(f)
 
@@ -28,18 +35,18 @@ for file in os.listdir(raw_folder):
     for i, frame in enumerate(frames):
         rgb = frame[:, :, ::-1]  # BGR to RGB
         dets = detector(rgb, 1)
+
         if len(dets) == 0:
             print(f"  Frame {i+1}: no face found, skipping")
             continue
-        shape = shape_predictor(rgb, dets[0])
 
+        shape = shape_predictor(rgb, dets[0])
         rgb = np.ascontiguousarray(rgb, dtype=np.uint8)
         enc = face_rec_model.compute_face_descriptor(rgb, shape)
-        
+
         encodings.append(np.array(enc))
         print(f"  Frame {i+1}: encoded OK")
 
-    out_path = os.path.join(encoded_folder, f"{name}.pkl")
     with open(out_path, "wb") as f:
         pickle.dump(encodings, f)
 

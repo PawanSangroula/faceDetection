@@ -133,4 +133,6 @@ pip install opencv_python
 pip install numpy
 pip install mediapipe 
 
+python version: 3.11
+
 
